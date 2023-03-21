@@ -7,6 +7,7 @@ from torchvision.datasets import CIFAR10
 import numpy as np
 from torch.utils import data
 
+# a tmp change
 
 #MLP
 # A helper function to randomly initialize weights and biases

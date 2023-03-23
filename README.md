@@ -1,2 +1,2 @@
 # JAX
-CODEING with JAX
+CODING with JAX

@@ -50,7 +50,7 @@ class Net:
         return vmap(self.forward, in_axes=[None, 0])(params, y)
     def loss_func(self, params, x, y):
         preds = self.batched_forward(params, x)
-        return -jnp.mean(jnp.dot(preds, y))
+        return -jnp.mean(preds * y)
     def update(self, x, y):
         loss = self.loss_func
         grads = grad(loss)(self.params, x, y)

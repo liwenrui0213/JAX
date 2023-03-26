@@ -11,8 +11,8 @@ from jax.scipy.special import logsumexp
 
 layer_sizes = [3*1024, 512, 512, 10]
 step_size = 0.01
-num_epochs = 8
-batch_size = 128
+num_epochs = 2
+batch_size = 16
 test_size = 10000
 n_targets = 10
 #net

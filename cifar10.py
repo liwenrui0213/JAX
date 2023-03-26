@@ -9,7 +9,7 @@ from torch.utils import data
 from jax.scipy.special import logsumexp
 
 
-layer_sizes = [3*1024, 512, 512, 10]
+layer_sizes = [3*128, 64, 64, 10]
 step_size = 0.01
 num_epochs = 1
 batch_size = 1
@@ -77,7 +77,8 @@ class Net:
             return self.accuracy(x, y)
     def laplacian(self, params, x, y):
         def hessian(f):
-            return jax.jacfwd(jax.grad(f))
+            grad = jax.grad(f, argnums=[1,2])
+            return jax.jacfwd(grad, argnums=[1,2])
         hessian = hessian(self.loss_func)(params, x, y)
         laplacian = jnp.trace(hessian)
         return laplacian

@@ -46,17 +46,19 @@ class Net:
         final_w, final_b = params[-1]
         logits = jnp.dot(final_w, activations) + final_b
         return logits - logsumexp(logits)
-    def batched_forward(self,params, y):
+    def batched_forward(self, params, y):
         return vmap(self.forward, in_axes=[None, 0])(params, y)
-    def loss_func(self,params, x, y):
+    def loss_func(self, params, x, y):
         preds = self.batched_forward(params, x)
-        return -jnp.mean(preds * y)
+        return -jnp.mean(jnp.dot(preds, y))
     def update(self, x, y):
         loss = self.loss_func
         grads = grad(loss)(self.params, x, y)
+        laplacian = self.laplacian(self.params, x, y)
         params = [(w - step_size * dw, b - step_size * db)
             for (w, b), (dw, db) in zip(self.params, grads)]
         self.params = params
+        return laplacian
     def accuracy(self, x, y):
         #target_class = jnp.argmax(y, axis=1)
         predicted_class = jnp.argmax(self.batched_forward(self.params, x), axis=1)
@@ -68,11 +70,17 @@ class Net:
 
         for x, y in dataloader:
             y = one_hot(y, n_targets)
-            self.update(x, y)
+            laplacian = self.update(x, y)
+            print('laplacian = {}'.format(laplacian))
     def test(self, dataloader):
         for x, y in dataloader:
             return self.accuracy(x, y)
-
+    def laplacian(self, params, x, y):
+        def hessian(f):
+            return jax.jacfwd(jax.grad(f))
+        hessian = hessian(self.loss_func)(params, x, y)
+        laplacian = jnp.trace(hessian)
+        return laplacian
 
 
 #dataset

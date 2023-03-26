@@ -9,7 +9,7 @@ from torch.utils import data
 from jax.scipy.special import logsumexp
 
 
-layer_sizes = [3*128, 64, 64, 10]
+layer_sizes = [3*1024, 64, 64, 10]
 step_size = 0.01
 num_epochs = 1
 batch_size = 1
@@ -17,11 +17,11 @@ test_size = 10000
 n_targets = 10
 #net
 class Net:
-    def __init__(self, train=True):
+    def __init__(self, train=True, params_file=None):
         if train:
             self.params = self.random_init()
         else :
-            self.params = self.load()
+            self.params = self.load(params_file)
     def random_init(self):
         def random_layer_params(m, n, key, scale=1e-2):
             w_key, b_key = random.split(key)

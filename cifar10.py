@@ -77,8 +77,8 @@ class Net:
             return self.accuracy(x, y)
     def laplacian(self, params, x, y):
         def hessian(f):
-            grad = jax.grad(f, argnums=[1,2])
-            return jax.jacfwd(grad, argnums=[1,2])
+            grad = jax.grad(f, argnums=1)
+            return jax.jacfwd(grad, argnums=1)
         hessian = hessian(self.loss_func)(params, x, y)
         laplacian = jnp.trace(hessian)
         return laplacian

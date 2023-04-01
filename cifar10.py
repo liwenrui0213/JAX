@@ -37,12 +37,12 @@ class Net:
         pass
 
     def forward(self, params, x):
-        def relu(x):
-            return jnp.maximum(0, x)
+        def tanh(x):
+            return jnp.tanh(x)
         activations = x
         for w, b in params[:-1]:
             outputs = jnp.dot(w, activations) + b
-            activations = relu(outputs)
+            activations = tanh(outputs)
         final_w, final_b = params[-1]
         logits = jnp.dot(final_w, activations) + final_b
         return logits - logsumexp(logits)
@@ -54,7 +54,7 @@ class Net:
     def update(self, x, y):
         loss = self.loss_func
         grads = grad(loss)(self.params, x, y)
-        laplacian = self.laplacian(self.params, x, y)
+        laplacian = self.batched_laplacian(self.params, x, y)
         params = [(w - step_size * dw, b - step_size * db)
             for (w, b), (dw, db) in zip(self.params, grads)]
         self.params = params
@@ -75,14 +75,18 @@ class Net:
     def test(self, dataloader):
         for x, y in dataloader:
             return self.accuracy(x, y)
-    def laplacian(self, params, x, y):
+    def batched_laplacian(self, params, x, y):
+        def loss(params, x, y):
+            preds = self.forward(params, x)
+            return jnp.dot(preds, y)
+            #return jnp.dot(x, x)                 #for test
         def hessian(f):
             grad = jax.grad(f, argnums=1)
             return jax.jacfwd(grad, argnums=1)
-        hessian = hessian(self.loss_func)(params, x, y)
-        laplacian = jnp.trace(hessian)
-        return laplacian
-
+        def laplacian(params, x, y):
+            h = hessian(loss)(params, x, y)
+            return jnp.trace(h)
+        return vmap(laplacian, in_axes=[None, 0, 0])(params, x, y)
 
 #dataset
 def numpy_collate(batch):

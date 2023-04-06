@@ -34,7 +34,6 @@ class Net:
         pass
     def load(self):
         pass
-
     def forward(self, params, x):
         def tanh(x):
             return jnp.tanh(x)
@@ -86,22 +85,22 @@ class FlattenAndCast(object):
     return np.ravel(np.array(pic, dtype=jnp.float32))
 
 
-class loss_function:
+class Loss_function:
     def __init__(self, net):
         self.net = net
     def loss(self,params, x, y):
         return 0
     def __call__(self, params, x, y):
         return self.loss(params, x, y)
-class loss_func(loss_function):
+class Loss_func(Loss_function):
     def __init__(self, net):
-        super(loss_func, self).__init__(net)
+        super(self.__class__, self).__init__(net)
     def loss(self, params, x, y):
         preds = self.net.batched_forward(params, x)
         return -jnp.mean(preds * y)
-class single_loss(loss_function):
+class Single_loss(Loss_function):
     def __init__(self, net):
-        super(loss_function, self).__init__(net)
+        super(self.__class__, self).__init__(net)
     def loss(self, params, x, y):
         preds = net.forward(params, x)
         return -jnp.dot(preds, y)
@@ -123,7 +122,7 @@ def train(net, optimizer, loss, dataloader):
     def one_hot(x, k, dtype=jnp.float32):
         """Create a one-hot encoding of x of size k."""
         return jnp.array(x[:, None] == jnp.arange(k), dtype)
-    loss2 = single_loss(net)
+    loss2 = Single_loss(net)
     for x, y in dataloader:
         y = one_hot(y, n_targets)
         update(net, optimizer, loss, x, y)
@@ -140,7 +139,6 @@ def batched_laplacian(net, f, x, y):
     def laplacian(params, x, y):
         h = hessian(f)(params, x, y)
         return jnp.trace(h)
-
     params = net.params
     return vmap(laplacian, in_axes=[None, 0, 0])(params, x, y)
 
@@ -152,7 +150,7 @@ if __name__ == '__main__':
     training_generator = NumpyLoader(cifar10_dataset, batch_size=batch_size, num_workers=0)
     cifar10_testset = CIFAR10('./datasets', download=True, transform=FlattenAndCast(), train=False)
     test_generator = NumpyLoader(cifar10_testset, batch_size=test_size, num_workers=0)
-    loss1 = loss_func(net)
+    loss1 = Loss_func(net)
     for epoch in range(num_epochs):
         start_time = time.time()
         optimizer = GD()

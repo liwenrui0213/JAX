@@ -10,7 +10,6 @@ from jax.scipy.special import logsumexp
 
 
 layer_sizes = [3*1024, 64, 64, 10]
-step_size = 0.01
 num_epochs = 1
 batch_size = 1
 test_size = 10000
@@ -48,46 +47,13 @@ class Net:
         return logits - logsumexp(logits)
     def batched_forward(self, params, y):
         return vmap(self.forward, in_axes=[None, 0])(params, y)
-    def loss_func(self, params, x, y):
-        preds = self.batched_forward(params, x)
-        return -jnp.mean(preds * y)
-    def update(self, x, y):
-        loss = self.loss_func
-        grads = grad(loss)(self.params, x, y)
-        laplacian = self.batched_laplacian(self.params, x, y)
-        params = [(w - step_size * dw, b - step_size * db)
-            for (w, b), (dw, db) in zip(self.params, grads)]
-        self.params = params
-        return laplacian
-    def accuracy(self, x, y):
-        #target_class = jnp.argmax(y, axis=1)
-        predicted_class = jnp.argmax(self.batched_forward(self.params, x), axis=1)
-        return jnp.mean(predicted_class == y)
-    def train(self, dataloader):
-        def one_hot(x, k, dtype=jnp.float32):
-            """Create a one-hot encoding of x of size k."""
-            return jnp.array(x[:, None] == jnp.arange(k), dtype)
-
-        for x, y in dataloader:
-            y = one_hot(y, n_targets)
-            laplacian = self.update(x, y)
-            print('laplacian = {}'.format(laplacian))
-    def test(self, dataloader):
-        for x, y in dataloader:
-            return self.accuracy(x, y)
-    def batched_laplacian(self, params, x, y):
-        def loss(params, x, y):
-            preds = self.forward(params, x)
-            return jnp.dot(preds, y)
-            #return jnp.dot(x, x)                 #for test
-        def hessian(f):
-            grad = jax.grad(f, argnums=1)
-            return jax.jacfwd(grad, argnums=1)
-        def laplacian(params, x, y):
-            h = hessian(loss)(params, x, y)
-            return jnp.trace(h)
-        return vmap(laplacian, in_axes=[None, 0, 0])(params, x, y)
-
+#optmizer
+class GD:
+    def __init__(self, lr=1e-2, step_size= 1e-2):
+        self.lr = lr
+        self.step_size = step_size
+    def step(self, params, grads):
+        return -self.step_size * grads
 #dataset
 def numpy_collate(batch):
   if isinstance(batch[0], np.ndarray):
@@ -120,6 +86,64 @@ class FlattenAndCast(object):
     return np.ravel(np.array(pic, dtype=jnp.float32))
 
 
+class loss_function:
+    def __init__(self, net):
+        self.net = net
+    def loss(self,params, x, y):
+        return 0
+    def __call__(self, params, x, y):
+        return self.loss(params, x, y)
+class loss_func(loss_function):
+    def __init__(self, net):
+        super(loss_func, self).__init__(net)
+    def loss(self, params, x, y):
+        preds = self.net.batched_forward(params, x)
+        return -jnp.mean(preds * y)
+class single_loss(loss_function):
+    def __init__(self, net):
+        super(loss_function, self).__init__(net)
+    def loss(self, params, x, y):
+        preds = net.forward(params, x)
+        return -jnp.dot(preds, y)
+        #return jnp.dot(x, x)
+
+def update(net, optimizer, loss, x, y):
+    params = net.params
+    grads = grad(loss)(params, x, y)
+    delta = optimizer.step(params, grads)
+    params = [(w + dw, b + db)
+        for (w, b), (dw, db) in zip(params, delta)]
+    net.params = params
+def accuracy(net, x, y):
+    #target_class = jnp.argmax(y, axis=1)
+    params = net.params
+    predicted_class = jnp.argmax(net.batched_forward(params, x), axis=1)
+    return jnp.mean(predicted_class == y)
+def train(net, optimizer, loss, dataloader):
+    def one_hot(x, k, dtype=jnp.float32):
+        """Create a one-hot encoding of x of size k."""
+        return jnp.array(x[:, None] == jnp.arange(k), dtype)
+    loss2 = single_loss(net)
+    for x, y in dataloader:
+        y = one_hot(y, n_targets)
+        update(net, optimizer, loss, x, y)
+        laplacian = batched_laplacian(net, loss2, x, y)
+        print('laplacian = {}'.format(laplacian))
+def test(net, dataloader):
+    for x, y in dataloader:
+        return accuracy(net, x, y)
+
+def batched_laplacian(net, f, x, y):
+    def hessian(g):
+        grad = jax.grad(g, argnums=1)
+        return jax.jacfwd(grad, argnums=1)
+    def laplacian(params, x, y):
+        h = hessian(f)(params, x, y)
+        return jnp.trace(h)
+
+    params = net.params
+    return vmap(laplacian, in_axes=[None, 0, 0])(params, x, y)
+
 
 import time
 net = Net()
@@ -128,10 +152,12 @@ if __name__ == '__main__':
     training_generator = NumpyLoader(cifar10_dataset, batch_size=batch_size, num_workers=0)
     cifar10_testset = CIFAR10('./datasets', download=True, transform=FlattenAndCast(), train=False)
     test_generator = NumpyLoader(cifar10_testset, batch_size=test_size, num_workers=0)
+    loss1 = loss_func(net)
     for epoch in range(num_epochs):
         start_time = time.time()
-        net.train(training_generator)
-        test_accuracy = net.test(test_generator)
+        optimizer = GD()
+        train(net, optimizer, loss1, training_generator)
+        test_accuracy = test(net, test_generator)
         epoch_time = time.time() - start_time
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
         print("Test set accuracy {}".format(test_accuracy))

@@ -52,7 +52,7 @@ class GD:
         self.lr = lr
         self.step_size = step_size
     def step(self, params, grads):
-        return -self.step_size * grads
+        return [(-self.step_size * dw, -self.step_size * db) for(dw, db) in grads]
 #dataset
 def numpy_collate(batch):
   if isinstance(batch[0], np.ndarray):
@@ -89,7 +89,7 @@ class Loss_function:
     def __init__(self, net):
         self.net = net
     def loss(self,params, x, y):
-        return 0
+        return None
     def __call__(self, params, x, y):
         return self.loss(params, x, y)
 class Loss_func(Loss_function):

@@ -20,15 +20,27 @@ class GD:
     def step(self, params, grads):
         return [(-self.step_size * dw, -self.step_size * db) for(dw, db) in grads]
 '''class ADAM:
-    def __init__(self, step_size = 1e-2, beta1 = 0.1, beta2 = 0.1, network = None, loss = None):
+    def __init__(self, step_size = 1e-2, beta1 = 0.1, beta2 = 0.1, network = None, loss = None, data_loader = None):
         self.net = network
         self.loss = loss
+        self.dataloader = data_loader
         self.params = self.net.params
         self.m = 0
         self.v = 0
         self.t = 0
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.stepsize = step_size
     def update(self):
-        self.t += 1'''
+        self.t += 1
+        for x, y in self.dataloader:
+            gt = grad(self.loss)(self.params, x, y)
+            mt = self.beta1 * self.m + (1-self.beta1) * gt
+            vt = self.beta2 * self.v +(1-self.beta2) * jnp.dot(gt, gt)
+            mt = mt/(1 - self.beta1**self.t)
+            vt = vt/(1 - self.beta2**self.t)
+            self.params = self.params - self.stepsize * mt/(1e-8 + jnp.sqrt(jnp.dot(vt, vt)))
+'''
 
 class Loss_function:
     def __init__(self, net):
@@ -63,12 +75,12 @@ def accuracy(net, x, y):
     params = net.params
     predicted_class = jnp.argmax(net.batched_forward(params, x), axis=1)
     return jnp.mean(predicted_class == y)
-def train(net, optimizer, loss, dataloader):
+def train(net, optimizer, loss, Dataloader):
     def one_hot(x, k, dtype=jnp.float32):
         """Create a one-hot encoding of x of size k."""
         return jnp.array(x[:, None] == jnp.arange(k), dtype)
     loss2 = Single_loss(net)
-    for x, y in dataloader:
+    for x, y in Dataloader:
         y = one_hot(y, n_targets)
         update(net, optimizer, loss, x, y)
         laplacian = batched_laplacian(net, loss2, x, y)
@@ -99,10 +111,12 @@ if __name__ == '__main__':
     cifar10_testset = CIFAR10('./datasets', download=True, transform=FlattenAndCast(), train=False)
     test_generator = NumpyLoader(cifar10_testset, batch_size=test_size, num_workers=0)
     loss1 = Loss_func(net)
+    #optimizer = ADAM(network=net, loss=loss1, data_loader=training_generator)
     for epoch in range(num_epochs):
         start_time = time.time()
         optimizer = GD()
         train(net, optimizer, loss1, training_generator)
+        #optimizer.update()
         test_accuracy = test(net, test_generator)
         epoch_time = time.time() - start_time
         print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))

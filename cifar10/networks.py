@@ -3,13 +3,14 @@ from jax import numpy as jnp
 from jax import random
 from jax import vmap,grad
 from jax.scipy.special import logsumexp
+from jax import lax
 
 class MLP:
-    def __init__(self, layer_sizes, train=True, params_file = None):
+    def __init__(self, layer_sizes, train=True, params_file=None):
+        self.layer_sizes = layer_sizes
         if train:
             self.params = self.random_init()
-            self.layer_sizes = layer_sizes
-        else :
+        else:
             self.params = self.load(params_file)
     def random_init(self):
         def random_layer_params(m, n, key, scale=1e-2):
@@ -37,4 +38,48 @@ class MLP:
     def batched_forward(self, params, y):
         return vmap(self.forward, in_axes=[None, 0])(params, y)
 
+class CONV:
+    def __init__(self, size):
+        self.size = size  #HWIO
+        self.params = jnp.transpose(jnp.zeros(size, dtype=jnp.float32), [3, 2, 0, 1])  #transpose to OIHW
+    def forward(self, params, x):   #x.shape = NCHW
+        x = jnp.reshape(x, (1, *x.shape))     #CHW -> 1CHW
+        kernel = params
+        out = lax.conv(x, kernel, (1, 1), 'SAME')
+        #def ReLU(x):
+            #return jnp.max(0, x)
+        def tanh(x):
+            return jnp.tanh(x)
+        out = tanh(out)
+        return out
+class Linear:
+    def __init__(self, size):
+        self.size = size
+        self.params = (jnp.zeros(size), jnp.zeros((size[1],)))
+    def forward(self, params, x):
+        w, b = params
+        out = jnp.dot(w, x) +b
+        def tanh(x):
+            return jnp.tanh(x)
+        out = tanh(out)
+        return out
+
+class CNN:
+    def __init__(self, train=True, params_files=None):
+        if train:
+            self.conv1 = CONV((32, 32, 3, 3))
+            self.conv2 = CONV((32, 32, 3, 3))
+            self.conv3 = CONV((32, 32, 3, 3))
+            self.Linear1 = Linear((3*1024, 10))
+            self.params = [self.conv1.params, self.conv2.params, self.conv3.params, self.Linear1.params]
+
+    def forward(self, params, x):
+        out = self.conv1.forward(params[0], x)
+        out = self.conv2.forward(params[1], out)
+        out = self.conv3.forward(params[2], out)
+        out = jnp.reshape(out, (3*1024,))
+        out = self.Linear1.forward(params[3], out)
+        return out - logsumexp(out)
+    def batched_forward(self, params, x):
+        return vmap(self.forward, in_axes=[None, 0])(params, x)
 

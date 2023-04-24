@@ -51,14 +51,16 @@ class CONV:
         def tanh(x):
             return jnp.tanh(x)
         out = tanh(out)
+        out = jnp.squeeze(out, 0)
         return out
 class Linear:
-    def __init__(self, size):
+    def __init__(self, size):   #size=(3*1024, 10)
         self.size = size
         self.params = (jnp.zeros(size), jnp.zeros((size[1],)))
-    def forward(self, params, x):
-        w, b = params
-        out = jnp.dot(w, x) +b
+    def forward(self, params, x):  #x.shape = (3*1024)
+        w = params[0]
+        b = params[1]
+        out = jnp.dot(x, w) + b
         def tanh(x):
             return jnp.tanh(x)
         out = tanh(out)
@@ -77,7 +79,7 @@ class CNN:
         out = self.conv1.forward(params[0], x)
         out = self.conv2.forward(params[1], out)
         out = self.conv3.forward(params[2], out)
-        out = jnp.reshape(out, (3*1024,))
+        out = jnp.reshape(out, (3*1024))
         out = self.Linear1.forward(params[3], out)
         return out - logsumexp(out)
     def batched_forward(self, params, x):

@@ -24,8 +24,7 @@ class GD:
         for x, y in self.dataloader:
             y = one_hot(y, n_targets)
             greds = grad(self.loss)(self.params, x, y)
-            self.params = [(w + dw, b + db)
-                      for (w, b), (dw, db) in zip(self.params, greds)]
+            self.params = [t + dt for t, dt in zip(self.params, greds)]
             self.net.params = self.params
 
 '''class ADAM:
@@ -101,9 +100,9 @@ from dataloader import *
 net = networks.CNN()
 
 if __name__ == '__main__':
-    cifar10_dataset = CIFAR10('./datasets', download=True, transform=FlattenAndCast())
+    cifar10_dataset = CIFAR10('./datasets', download=True, transform=PILtoARRAY)
     training_generator = NumpyLoader(cifar10_dataset, batch_size=batch_size, num_workers=0)
-    cifar10_testset = CIFAR10('./datasets', download=True, transform=FlattenAndCast(), train=False)
+    cifar10_testset = CIFAR10('./datasets', download=True, transform=PILtoARRAY, train=False)
     test_generator = NumpyLoader(cifar10_testset, batch_size=test_size, num_workers=0)
     loss1 = Loss_func(net)
     #optimizer = ADAM(network=net, loss=loss1, data_loader=training_generator)
